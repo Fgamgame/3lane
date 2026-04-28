@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>3Dランゲーム</title>
+</head>
+<body style="margin:0;overflow:hidden;background:black;">
+
+<div id="hudUI" style="display:none;position:absolute;color:white;font-size:24px;left:20px;top:20px;z-index:995;">
+Score: <span id="score">10</span><br>
+Coin: <span id="coin">0</span><br>
+HP: <span id="hp">100</span>
+</div>
+
+<div id="titleMenu" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:320px;padding:24px;border:3px solid #fff;border-radius:16px;background:rgba(0,0,0,0.87);color:#fff;text-align:center;z-index:1001;">
+  <div style="font-size:36px;font-weight:bold;margin-bottom:16px;">3Dランゲーム</div>
+  <div style="font-size:18px;margin-bottom:8px;">ハイスコア TOP3</div>
+  <div id="highScoreList" style="font-size:16px;line-height:1.6;margin-bottom:14px;color:#ffe58a;">1. ---<br>2. ---<br>3. ---</div>
+  <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+    <button id="startBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#00aaff;color:#fff;cursor:pointer;">ゲームスタート</button>
+    <button id="shopBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#ffdd55;color:#222;cursor:pointer;">ショップ</button>
+  </div>
+</div>
+
+<div id="shopMenu" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:320px;padding:24px;border:3px solid #fff;border-radius:16px;background:rgba(0,0,0,0.9);color:#fff;text-align:center;z-index:1002;">
+  <div style="font-size:32px;font-weight:bold;margin-bottom:16px;">ショップ</div>
+  <div style="font-size:20px;margin-bottom:14px;">所持コイン: <span id="shopCoin">0</span></div>
+  <div style="font-size:18px;margin-bottom:18px;">現在のHP上限: <span id="shopMaxHp">5</span></div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+    <button id="buyMaxHpBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#00aaff;color:#fff;cursor:pointer;">上限HP増加</button>
+    <button id="buyPoopBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#9b59b6;color:#fff;cursor:pointer;">うんこボタン追加</button>
+    <button id="debugCoinBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#27ae60;color:#fff;cursor:pointer;">デバッグ: 無料で+30 coin</button>
+  </div>
+  <div id="shopItemStatus" style="font-size:14px;min-height:20px;margin-bottom:14px;color:#c9f7ff;"></div>
+  <button id="shopCloseBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#00aaff;color:#fff;cursor:pointer;">閉じる</button>
+</div>
+
+<div id="gameOverUI" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:320px;padding:24px;border:3px solid #fff;border-radius:16px;background:rgba(0,0,0,0.87);color:#fff;text-align:center;z-index:999;">
+  <div style="font-size:36px;font-weight:bold;margin-bottom:12px;">Game Over</div>
+  <div style="font-size:18px;margin-bottom:20px;">HPが0になりました</div>
+  <div style="display:flex;justify-content:space-around;gap:10px;flex-wrap:wrap;">
+    <button id="restartBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#00aaff;color:#fff;cursor:pointer;">Restart</button>
+    <button id="titleBtn" style="font-size:16px;padding:10px 14px;border:none;border-radius:8px;background:#ffdd55;color:#222;cursor:pointer;">タイトルへ戻る</button>
+  </div>
+</div>
+
+<div id="gameOverOverlay" style="display:none;position:absolute;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:998;"></div>
+
+
+
+<script type="importmap">
+{
+ "imports": {
+   "three":"https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js"
+ }
+}
+</script>
+
+<script type="module">
+import { startGame, getShopState, buyShopItem, grantDebugCoin, getHighScores } from "./game.js";
+
+const titleMenu = document.getElementById("titleMenu");
+const startBtn = document.getElementById("startBtn");
+const shopBtn = document.getElementById("shopBtn");
+const highScoreList = document.getElementById("highScoreList");
+const shopMenu = document.getElementById("shopMenu");
+const shopCloseBtn = document.getElementById("shopCloseBtn");
+const shopCoin = document.getElementById("shopCoin");
+const shopMaxHp = document.getElementById("shopMaxHp");
+const shopItemStatus = document.getElementById("shopItemStatus");
+const buyMaxHpBtn = document.getElementById("buyMaxHpBtn");
+const buyPoopBtn = document.getElementById("buyPoopBtn");
+const debugCoinBtn = document.getElementById("debugCoinBtn");
+const hudUI = document.getElementById("hudUI");
+
+function renderHighScores() {
+  const highScores = getHighScores();
+  const lines = [];
+  for (let i = 0; i < 3; i++) {
+    const value = highScores[i];
+    lines.push(`${i + 1}. ${value !== undefined ? value : "---"}`);
+  }
+  highScoreList.innerHTML = lines.join("<br>");
+}
+
+function renderShop() {
+  const shopState = getShopState();
+  shopCoin.innerText = String(shopState.coin);
+  shopMaxHp.innerText = String(shopState.maxHp);
+  buyMaxHpBtn.innerText = `上限HP増加 (${shopState.prices.maxHpIncrease} coin)`;
+  buyPoopBtn.innerText = shopState.hasPoopButton
+    ? `うんこボタン追加 (購入済み)`
+    : `うんこボタン追加 (${shopState.prices.poopButton} coin)`;
+}
+
+startBtn.addEventListener("click", () => {
+  titleMenu.style.display = "none";
+  hudUI.style.display = "block";
+  startGame();
+});
+
+shopBtn.addEventListener("click", () => {
+  shopItemStatus.innerText = "";
+  renderShop();
+  shopMenu.style.display = "block";
+});
+
+buyMaxHpBtn.addEventListener("click", () => {
+  const result = buyShopItem("maxHpIncrease");
+  shopItemStatus.innerText = result.message;
+  renderShop();
+});
+
+buyPoopBtn.addEventListener("click", () => {
+  const result = buyShopItem("poopButton");
+  shopItemStatus.innerText = result.message;
+  renderShop();
+});
+
+debugCoinBtn.addEventListener("click", () => {
+  const result = grantDebugCoin();
+  shopItemStatus.innerText = result.message;
+  renderShop();
+});
+
+shopCloseBtn.addEventListener("click", () => {
+  shopMenu.style.display = "none";
+});
+
+renderHighScores();
+</script>
+
+</body>
+</html>
